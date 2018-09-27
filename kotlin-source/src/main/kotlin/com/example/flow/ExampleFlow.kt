@@ -39,6 +39,9 @@ object ExampleFlow {
             object GENERATING_TRANSACTION : Step("Generating transaction based on new IOU.")
             object VERIFYING_TRANSACTION : Step("Verifying contract constraints.")
             object SIGNING_TRANSACTION : Step("Signing transaction with our private key.")
+            object THIRD_PARTY_SIGN : Step("A Third Party, Signing transaction with our private key."){
+                override fun childProgressTracker() = CollectSignaturesFlow.tracker()
+            }
             object GATHERING_SIGS : Step("Gathering the counterparty's signature.") {
                 override fun childProgressTracker() = CollectSignaturesFlow.tracker()
             }
@@ -50,6 +53,7 @@ object ExampleFlow {
             fun tracker() = ProgressTracker(
                     GENERATING_TRANSACTION,
                     VERIFYING_TRANSACTION,
+                    THIRD_PARTY_SIGN,
                     SIGNING_TRANSACTION,
                     GATHERING_SIGS,
                     FINALISING_TRANSACTION
@@ -85,9 +89,21 @@ object ExampleFlow {
             // Sign the transaction.
             val partSignedTx = serviceHub.signInitialTransaction(txBuilder)
 
-            // Stage 4.
-            progressTracker.currentStep = GATHERING_SIGS
+
+            val someOtherParty = serviceHub.networkMapCache.allNodes.filter { item -> item.legalIdentities.first() != otherParty && item.legalIdentities.first() != serviceHub.myInfo.legalIdentities.first() }.get(0)
+
+            /*
+            if(someOtherParty.legalIdentities.first() != serviceHub.myInfo.legalIdentities.first()) {
+                // Stage 4.
+                progressTracker.currentStep = THIRD_PARTY_SIGN
+
+                val thirdyPartyFlow = initiateFlow(someOtherParty.legalIdentities.first())
+                val thirdPartyfullySignedTx = subFlow(CollectSignaturesFlow(partSignedTx, setOf(thirdyPartyFlow), THIRD_PARTY_SIGN.childProgressTracker()))
+            }
+            */
+
             // Send the state to the counterparty, and receive it back with their signature.
+            progressTracker.currentStep = GATHERING_SIGS
             val otherPartyFlow = initiateFlow(otherParty)
             val fullySignedTx = subFlow(CollectSignaturesFlow(partSignedTx, setOf(otherPartyFlow), GATHERING_SIGS.childProgressTracker()))
 

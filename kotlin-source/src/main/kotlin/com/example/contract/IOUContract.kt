@@ -49,5 +49,6 @@ class IOUContract : Contract {
      */
     interface Commands : CommandData {
         class Create : Commands
+        class CoSign : Commands
     }
 }
